@@ -3,7 +3,7 @@ window.addEventListener('DOMContentLoaded', function() {
 
   var $ = function(s) { return document.querySelector(s); };
 
-  $('#lb_files').selectedIndex = 0;
+//HACK  $('#lb_files').selectedIndex = 0;
 
   var frame = $('#frame');
 
@@ -91,10 +91,12 @@ window.addEventListener('DOMContentLoaded', function() {
     }());
   }
 
+/* HACK
   $('#btn_share').onclick = function(e) {
     // Load up the hidden text area with the current source
     $('#source').value = getSource();
   };
+*/
 
   function getSource() {
     return editor.getValue();
@@ -136,7 +138,7 @@ window.addEventListener('DOMContentLoaded', function() {
       display: display,
       paddle: function(n) { return pdl[n]; }
     });
-    setTimeout(driver, 0);
+    setTimeout(driver, 0 );
   });
 
   $('#btn_stop').addEventListener('click', function(e) {
@@ -147,6 +149,7 @@ window.addEventListener('DOMContentLoaded', function() {
     updateUI();
   });
 
+/* HACK
   $('#lb_files').addEventListener('change', function() {
     var sel = $('#lb_files');
     loadFile('samples/' + sel.value + ".txt", setSource);
@@ -194,7 +197,7 @@ window.addEventListener('DOMContentLoaded', function() {
     printer.close();
     printer = null;
   });
-
+*/
   // Mouse-as-Joystick
   var wrapper = $('#screen-wrapper');
   wrapper.addEventListener('mousemove', function(e) {
@@ -211,7 +214,9 @@ window.addEventListener('DOMContentLoaded', function() {
                     document.activeElement === $("#btn_stop"));
     $("#btn_stop").disabled = stopped ? "disabled" : "";
     $("#btn_run").disabled = stopped ? "" : "disabled";
+    /* HACK
     $("#lb_files").disabled = stopped ? "" : "disabled";
+    */
 
     if (btnFocus || stopped) {
       $(stopped ? "#btn_run" : "#btn_stop").focus();
@@ -225,6 +230,8 @@ window.addEventListener('DOMContentLoaded', function() {
   // Number of steps to execute before yielding execution
   // (Use a prime to minimize risk of phasing with loops)
   var NUM_SYNCHRONOUS_STEPS = 37;
+
+  var TIMEOUT_PER_OPERATION = 50;   // 0 makes it run unthrottled. 50 is roughly AII speeds
 
   function driver() {
     var state = basic.STATE_RUNNING;
@@ -251,7 +258,7 @@ window.addEventListener('DOMContentLoaded', function() {
     } else if (state === basic.STATE_BLOCKED) {
       // Fall out
     } else { // state === basic.STATE_RUNNING
-      setTimeout(driver, 0); // Keep going
+      setTimeout(driver, TIMEOUT_PER_OPERATION); // Keep going
     }
   }
 
@@ -280,11 +287,20 @@ window.addEventListener('DOMContentLoaded', function() {
     req.send(null);
   }
 
+  /* autorun - callback to run right after the file loads.
+  */
+  function autoRun( source )
+  {
+    setSource( source );
+    $("#btn_run").click(); // kinda a hack.
+  }
+
   // load default
   var params = parseQueryParams();
   if ('source' in params) {
     setSource(params.source);
   } else {
     loadFile('samples/sample.default.txt', setSource);
+    //loadFile( 'ROLLERCOASTER-2018.sdl.txt', autoRun );
   }
 });

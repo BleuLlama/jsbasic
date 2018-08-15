@@ -225,6 +225,7 @@ this.basic = (function() {
     this.next();
   }
 
+
   // Multidimensional array, with auto-dimensioning on first access
   function BASICArray(type, dims) {
 
@@ -412,7 +413,13 @@ this.basic = (function() {
       0xC060: function() { return env.tty.getButtonState ? env.tty.getButtonState(3) : 0; },
       0xC061: function() { return env.tty.getButtonState ? env.tty.getButtonState(0) : 0; },
       0xC062: function() { return env.tty.getButtonState ? env.tty.getButtonState(1) : 0; },
-      0xC063: function() { return env.tty.getButtonState ? env.tty.getButtonState(2) : 0; }
+      0xC063: function() { return env.tty.getButtonState ? env.tty.getButtonState(2) : 0; },
+
+      // ACIA fakeout
+      0xC0A8: function() { return ACIA_Peek( 0 ); },
+      0xC0A9: function() { return ACIA_Peek( 1 ); },
+      0xC0AA: function() { return ACIA_Peek( 2 ); },
+      0xC0AB: function() { return ACIA_Peek( 3 ); }
     };
 
     poke_table = {
@@ -444,7 +451,13 @@ this.basic = (function() {
       0xC057: function() { if (env.display) { env.display.setState("lores", false); } }, // Hi-Res
 
       // Speaker toggle
-      0xC030: function() { } // no-op
+      0xC030: function() { }, // no-op
+
+      // ACIA fakeout
+      0xC0A8: function( v ) { ACIA_Poke( 0, v ); },
+      0xC0A9: function( v ) { ACIA_Poke( 1, v ); },
+      0xC0AA: function( v ) { ACIA_Poke( 2, v ); },
+      0xC0AB: function( v ) { ACIA_Poke( 3, v ); }
     };
 
     call_table = {
@@ -992,6 +1005,8 @@ this.basic = (function() {
       'pr#': function PR(slot) {
         if (slot === 0) {
           if (env.tty.setFirmwareActive) { env.tty.setFirmwareActive(false); }
+        } else if (slot === 2) {
+          console.log( "PR#2 - Fake initialize ACIA" );
         } else if (slot === 3) {
           if (env.tty.setFirmwareActive) { env.tty.setFirmwareActive(true); }
         }
@@ -1059,7 +1074,27 @@ this.basic = (function() {
         n = n >> 0;
         if (n > 0x7fff || n < -0x8000) { runtime_error(ERRORS.ILLEGAL_QUANTITY); }
         return n;
+      },
+
+      'wait': function wait( addr, mask ){
+        // ACIA Hack 2018
+        // only work for 0xC0A9 - ACIA slot 2, status for now
+        console.log( "WAIT " + addr + " " + mask + "    " + 0xC0A9 );
+        if( addr != 0xC0A9 ) { return mask; }
+
+        alert( "Wait is not implemented, use a PEEK loop instead!" );
+        return mask;
+
+        var c = 0;
+        while( true ) {
+          var rv = ACIA_Peek( 1 ); // should just call PEEK here.
+          if( rv & mask ) { 
+            console.log( "waited." ); return mask; }
+          console.log( c );
+          c = c+1;
+        }
       }
+
     };
 
     // Apply a signature [return_type, arg0_type, arg1_type, ...] to a function
@@ -1695,7 +1730,6 @@ this.basic = (function() {
           var args = Array.prototype.slice.call(arguments, 1);
           return 'lib[' + quote(name) + '](' + args.join(',') + ');';
         }
-
         var keyword = test('identifier') ? kws.LET : match('reserved'),
             name, type, subscripts, is_to, expr, param, args, prompt, trailing, js;
 
@@ -2041,6 +2075,11 @@ this.basic = (function() {
           case kws.SPEED:  // Output speed
             return slib('speed', parseNumericExpression());
 
+          case kws.WAIT:    // Wait for memory value to match a condition
+            return slib( 'wait',
+                            parseNumericExpression(),
+                            match("operator", ",") && parseNumericExpression());
+
             //////////////////////////////////////////////////////////////////////
             //
             // INTROSPECTION
@@ -2074,7 +2113,7 @@ this.basic = (function() {
           case kws.HIMEM:  // Set upper bound of variable memory
           case kws.IN:     // Direct input from slot
           case kws.LOMEM:  // Set low bound of variable memory
-          case kws.WAIT:    // Wait for memory value to match a condition
+//          case kws.WAIT:    // Wait for memory value to match a condition
           case kws.AMPERSAND:       // Command hook
             throw parse_error("Native interop statement not supported: " + keyword);
 
